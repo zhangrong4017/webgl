@@ -17,7 +17,7 @@ let gl = canvas.getContext("experimental-webgl");
 
 let mouse = {};
 
-// Model object
+// Model object模型对象
 let mesh = {"loaded": false};
 let quad = makeQuad();
 let base = makeBase();
@@ -55,7 +55,7 @@ function makeSlice()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-
+//滑动条移动，绘制切片
 document.getElementById("slider").oninput = function(event)
 {
     //滑动条的位置
@@ -103,17 +103,25 @@ function mouseMoveListener(event)
         draw();
     }
 }
-
+//创建着色器
+//txt-着色器源代码
+//type-gl.VERTEX_SHADER 点 gl.FRAGMENT_SHADER线段
+//返回着色器s
 function buildShader(txt, type)
 {
+    //创建一个webGL着色器，type：gl.VERTEX_SHADER 点 gl.FRAGMENT_SHADER线段
     let s = gl.createShader(type);
+    //设置webGL着色器的源代码，s-着色器对象，txt-包含待设置的GLSL原代码
     gl.shaderSource(s, txt);
+    //编译着色器
     gl.compileShader(s);
 
+    //判断是否成功编译
     if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
     {
         throw "Could not compile shader:" + gl.getShaderInfoLog(s);
     }
+    //返回着色器
     return s;
 }
 
@@ -133,10 +141,15 @@ function setAttribs(prog, a)
 //=====================================================
 function makeProgram(vert, frag, uniforms, attribs)
 {
-    let v = buildShader(vert, gl.VERTEX_SHADER);
-    let f = buildShader(frag, gl.FRAGMENT_SHADER);
+    //创建着色器
+    let v = buildShader(vert, gl.VERTEX_SHADER);//点类型
+    let f = buildShader(frag, gl.FRAGMENT_SHADER);//线段类型
 
+
+    //创建和初始化一个webGLProgram对象
     let prog = gl.createProgram();
+
+    //附着着色器v，f，链接prog程序对象
     gl.attachShader(prog, v);
     gl.attachShader(prog, f);
     gl.linkProgram(prog);
@@ -237,6 +250,8 @@ function drawBase(base)
     gl.disable(gl.CULL_FACE);
 }
 
+//参数：quad，来源于makequad
+
 function drawQuad(quad)
 {
     gl.useProgram(quad.prog);
@@ -271,11 +286,14 @@ function draw()
     //清除颜色缓冲
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    drawBase(base);
+    //绘制坐标轴
+     drawBase(base);
 
     if (mesh.loaded)
     {
+        //绘制3D模型
         drawMesh(mesh, true);
+        //绘制截面
         drawQuad(quad);
     }
 }
@@ -450,29 +468,42 @@ function renderSlice()
 {
     // We won't be using the depth test in this rendering pass
     //此处不会使用到深度测试
-    gl.disable(gl.DEPTH_TEST);
-    gl.enable(gl.STENCIL_TEST);
+    gl.disable(gl.DEPTH_TEST);//禁用深度测试
+    //设置模版测试的前、后功能和参考值。
+    //模版可以在每个像素的基础上启用和禁用绘图。它通常用于多通道渲染以获得特殊效果。
+    gl.enable(gl.STENCIL_TEST);//激活模板测试并更新模板缓冲区
+    //设置视窗，指定从设备与显示设备之间，x和y的仿射变换，printer.resolution.x/y为画布大小参数
     gl.viewport(0, 0, printer.resolution.x, printer.resolution.y);
 
     // Bind the target framebuffer
     //绑定目标帧缓冲区
+    //gl.FRAMEBUFFER：用于渲染图像的颜色、alpha（透明度）、深度和模板缓冲区的收集缓冲区数据存储。
+    //slice.fbo：待绑定的WebGLFramebuffer对象
     gl.bindFramebuffer(gl.FRAMEBUFFER, slice.fbo);
 
-    // Attach our output texture
-    //附上我们的输出纹理
+    
+    //为framebuffer附上输出纹理
+    //gl.FRAMEBUFFER:将纹理附加到帧缓冲区的颜色缓冲区
+    //gl.COLOR_ATTACHMENT0:将纹理附加到帧缓冲区的颜色缓冲区
+    //gl.TEXTURE_2D:指定纹理目标对象为2D图像
+    //slice.tex:webGL待附上的纹理
     gl.framebufferTexture2D(
         gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
         gl.TEXTURE_2D, slice.tex, 0);
 
     // Bind the renderbuffer to get a stencil buffer
     //绑定渲染缓冲区以获取模板缓冲区
+    //绑定渲染缓冲区，slice.buf:待绑定的渲染缓冲区对象
     gl.bindRenderbuffer(gl.RENDERBUFFER, slice.buf);
+    //创建并初始化渲染缓冲区对象的数据存储区。
+    // printer.resolution.x渲染缓冲区的像素宽度
     gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_STENCIL,
                            printer.resolution.x, printer.resolution.y);
     gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT,
                                gl.RENDERBUFFER, slice.buf);
 
     // Clear texture清除质地
+    //清除颜色
     gl.clearColor(0, 0, 0, 0);
     gl.clearStencil(0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
